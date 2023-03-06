@@ -26,7 +26,7 @@ typedef enum _game_tile {
 	tile_6144
 } game_tile;
 
-
+char new_board[4][4];
 char board[4][4];
 
 char start_deck[] = {1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3};
@@ -75,7 +75,6 @@ game_tile random_game_tile() {
 	current_deck[0] = 0;
 	clear_deck(current_deck, sizeof(current_deck));
 
-
 	return cur_tile;
 }
 
@@ -104,7 +103,7 @@ typedef struct _POS2D {
 } POS2D;
 
 void draw_board() {
-	for(int x = 0; x < 4; x++) {
+	for (int x = 0; x < 4; x++) {
 		for (int y = 0; y < 4; y++) {
 			if ((u8)(board[x][y]) == (u8)empty) {
 				obj_hide(&test_objs[(y * 4) + x]);
@@ -117,6 +116,45 @@ void draw_board() {
 	}
 
 	oam_copy(oam_mem, test_objs, 4 * 4);
+}
+
+void attempt_move_tile(int x, int y, int x_n, int y_n) {
+	//memset(new_board, 0, sizeof(new_board));
+
+	// we're trying to move beyond the edge of the screen
+	if (x_n < 0 || x_n > 3 || y_n < 0 || y_n > 3) {
+		new_board[x][y] = board[x][y];
+		return;
+	}
+
+	// if the spot is empty it's easy
+	if ((u8)new_board[x_n][y_n] == (u8)empty) {
+		new_board[x_n][y_n] = board[x][y];
+		//board[x][y] = empty;
+		return;
+	}
+
+	// if they match
+	if (board[x][y] == board[x_n][y_n]) {
+		// 1 and 2 can't match
+		if (board[x][y] == tile_1 || board[x][y] == tile_2) {
+			new_board[x][y] = board[x][y];
+			return;
+		}
+		new_board[x_n][y_n] = (board[x][y]) + 1;
+		return;
+	}
+
+	if ((board[x][y] == tile_1 && board[x_n][y_n] == tile_2) || \
+		(board[x][y] == tile_2 && board[x_n][y_n] == tile_1)) {
+		new_board[x_n][y_n] = tile_3;
+		return;
+	}
+
+	if (board[x][y] != board[x_n][y_n]) {
+		new_board[x][y] = board[x][y];
+	}
+	//memcpy(board, new_board, sizeof(new_board));
 }
 
 void reset_board() {
@@ -151,6 +189,47 @@ int main() {
 		key_poll();
 		if (key_hit(KEY_START)) {
 			reset_board();
+		}
+
+		if (key_hit(KEY_UP)) {
+			memset(new_board, 0, sizeof(new_board));
+			for(int x = 0; x < 4; x++) {
+				for (int y = 0; y < 4; y++) {
+					attempt_move_tile(x, y, x, y-1);
+				}
+			}
+			//attempt_move(0, -1);
+			memcpy(board, new_board, sizeof(new_board));
+
+		} else if (key_hit(KEY_DOWN)) {
+			memset(new_board, 0, sizeof(new_board));
+			for(int x = 0; x < 4; x++) {
+				for (int y = 3; y >= 0; y--) {
+					attempt_move_tile(x, y, x, y+1);
+				}
+			}
+			//attempt_move(0, -1);
+			memcpy(board, new_board, sizeof(new_board));
+			//attempt_move(0, 1);
+		} else if (key_hit(KEY_LEFT)) {
+			memset(new_board, 0, sizeof(new_board));
+			for(int x = 0; x < 4; x++) {
+				for (int y = 0; y < 4; y++) {
+					attempt_move_tile(x, y, x-1, y);
+				}
+			}
+			//attempt_move(0, -1);
+			memcpy(board, new_board, sizeof(new_board));
+			//attempt_move(-1, 0);
+		} else if (key_hit(KEY_RIGHT)) {
+			memset(new_board, 0, sizeof(new_board));
+			for(int x = 3; x >= 0; x--) {
+				for (int y = 0; y < 4; y++) {
+					attempt_move_tile(x, y, x+1, y);
+				}
+			}
+			//attempt_move(0, -1);
+			memcpy(board, new_board, sizeof(new_board));
 		}
 		draw_board();
 	}
