@@ -7,6 +7,7 @@
 #include <stdbool.h>
 
 #include "sprites.h"
+#include "bg_tiles.h"
 
 typedef enum _game_tile {
 	empty,
@@ -45,6 +46,9 @@ game_state state = playing;
 int move_state = 0;
 int move_x = 0;
 int move_y = 0;
+
+#define SCREEN_NUM 4
+SCR_ENTRY *bg0_map = se_mem[SCREEN_NUM];
 
 bool is_deck_empty(char* deck) {
 	return deck[0] == 0;
@@ -142,17 +146,17 @@ void draw_board() {
 				continue;
 			}
 
-			obj_set_attr(&test_objs[(y * 4) + x], ATTR0_SQUARE | ATTR0_8BPP | ATTR0_REG, ATTR1_SIZE_32, ATTR2_PALBANK(0) | ((board[x][y] - 1) * 32) | ATTR2_PRIO(1));
+			obj_set_attr(&test_objs[(y * 4) + x], ATTR0_SQUARE | ATTR0_8BPP | ATTR0_REG, ATTR1_SIZE_32, ATTR2_PALBANK(0) | ((board[x][y] - 1) * 32) | ATTR2_PRIO(0));
 			if (moving_board[x][y]) {
-				obj_set_pos(&test_objs[(y * 4) + x], 50 + (x * 27) + (move_x * move_state), 20 + (y * 32) + (move_y * move_state));
+				obj_set_pos(&test_objs[(y * 4) + x], 65 + (x * 26) + (move_x * move_state), 16 + (y * 32) + (move_y * move_state));
 			} else {
-				obj_set_pos(&test_objs[(y * 4) + x], 50 + (x * 27), 20 + (y * 32));
+				obj_set_pos(&test_objs[(y * 4) + x], 65 + (x * 26), 16 + (y * 32));
 			}
 		}
 	}
 
-	obj_set_attr(&test_objs[(4 * 4)], ATTR0_SQUARE | ATTR0_8BPP | ATTR0_REG, ATTR1_SIZE_32, ATTR2_PALBANK(0) | ((next_tile - 1) * 32) | ATTR2_PRIO(1));
-	obj_set_pos(&test_objs[(4 * 4)], 20, 20 + (1 * 32));
+	obj_set_attr(&test_objs[(4 * 4)], ATTR0_SQUARE | ATTR0_8BPP | ATTR0_REG, ATTR1_SIZE_32, ATTR2_PALBANK(0) | ((next_tile - 1) * 32) | ATTR2_PRIO(0));
+	obj_set_pos(&test_objs[(4 * 4)], 20, 16 + (1 * 32));
 
 	oam_copy(oam_mem, test_objs, (4 * 4) + 1);
 }
@@ -199,6 +203,56 @@ void attempt_move_tile(int x, int y, int x_n, int y_n) {
 	}
 }
 
+inline bool is_valid_move(char t1, char t2) {
+	if (t1 == empty || t2 == empty) {
+		return true;
+	} else if ((t1 == tile_1 && t2 == tile_2) ||
+		(t1 == tile_2 && t2 == tile_1)) {
+		return true;
+	} else if (t1 == t2) {
+		return true;
+	}
+	return false;
+}
+
+// check to make sure no legal moves remain
+bool is_game_over() {
+	char cur_tile = empty;
+	for (int x = 0; x < 4; x++) {
+		for (int y = 0; y < 4; y++) {
+			cur_tile = board[x][y];
+			// check tiles to the left
+			if (x > 0) {
+				if (is_valid_move(cur_tile, board[x-1][y])) {
+					return false;
+				}
+			} else if (x < 3) {
+				if (is_valid_move(cur_tile, board[x+1][y])) {
+					return false;
+				}		
+			} else if (y > 0) {
+				if (is_valid_move(cur_tile, board[x][y-1])) {
+					return false;
+				}
+			} else if (y < 3) {
+				if (is_valid_move(cur_tile, board[x][y+1])) {
+					return false;
+				}		
+			}
+		}
+	}
+
+	return true;
+}
+
+int score_tile(game_tile tile) {
+	// hardcode the rules for the first few
+	if (tile < tile_3) {
+		return 0;
+	}
+	int pow = tile - tile_2;
+}
+
 void reset_board() {
 	memset(current_deck, 0, sizeof(current_deck));
 	memset(board, 0, sizeof(board));
@@ -219,13 +273,60 @@ void reset_board() {
 
 int main() {
 	vu8* vram = MEM_VRAM;
+
+	// copy the tiles in
+	dma3_cpy(MEM_VRAM, bg_tilesTiles, bg_tilesTilesLen);
+
+	// copy the tiles pal in
+	dma3_cpy(MEM_PAL, bg_tilesPal, 0x10);
+
+	REG_BG0CNT = BG_CBB(0) | BG_SBB(SCREEN_NUM) | BG_4BPP;
+	REG_BG0HOFS = 0;
+	REG_BG0VOFS = 0;
+
+	// top border
+	bg0_map[(1 * 32) + 8] = SE_PALBANK(0) | 1;
+	for (int i = 0; i < 12; i++) {
+		bg0_map[(1 * 32) + 9 + i] = SE_PALBANK(0) | 2;
+	}
+	bg0_map[(1 * 32) + 21] = SE_PALBANK(0) | 3;
+
+	bg0_map[(2 * 32) + 8] = SE_PALBANK(0) | 4;
+	for (int i = 0; i < 12; i++) {
+		bg0_map[(2 * 32) + 9 + i] = SE_PALBANK(0) | 5;
+	}
+	bg0_map[(2 * 32) + 21] = SE_PALBANK(0) | 6;
+
+
+	for (int y = 0; y < 14; y++) {
+		bg0_map[((3 + y) * 32) + 8] = SE_PALBANK(0) | 12;
+		bg0_map[((3 + y) * 32) + 21] = SE_PALBANK(0) | 13;
+		for (int x = 0; x < 12; x++) {
+			bg0_map[((3 + y) * 32) + 9 + x] = SE_PALBANK(0) | 5;
+		}
+	}
+
+	bg0_map[(17 * 32) + 8] = SE_PALBANK(0) | 7;
+	bg0_map[(17 * 32) + 21] = SE_PALBANK(0) | 8;
+	for (int i = 0; i < 12; i++) {
+		bg0_map[(17 * 32) + 9 + i] = SE_PALBANK(0) | 5;
+	}
+
+	// bottom border
+	bg0_map[(18 * 32) + 8] = SE_PALBANK(0) | 9;
+	for (int i = 0; i < 12; i++) {
+		bg0_map[(18 * 32) + 9 + i] = SE_PALBANK(0) | 10;
+	}
+	bg0_map[(18 * 32) + 21] = SE_PALBANK(0) | 11;
+
+	// load the sprites
 	dma3_cpy(&tile_mem[4][0], spritesTiles, spritesTilesLen);
 
 	vu8* pal = MEM_PAL;
 	dma3_cpy(pal_obj_mem, spritesPal, spritesPalLen);
 
 	oam_init(test_objs, 128);
-	REG_DISPCNT = DCNT_OBJ | DCNT_OBJ_1D;
+	REG_DISPCNT = DCNT_MODE0 | DCNT_BG0 | DCNT_OBJ | DCNT_OBJ_1D;
 
 	reset_board();
 	while(1) {
@@ -304,6 +405,7 @@ int main() {
 					board[0][new_cood] = next_tile;
 				}
 				next_tile = random_game_tile();
+
 				move_state = 0;
 			}
 		}
