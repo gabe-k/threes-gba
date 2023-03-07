@@ -26,11 +26,23 @@ typedef enum _game_tile {
 	tile_6144
 } game_tile;
 
+typedef enum _game_state {
+	playing,
+	moving
+} game_state;
+
 char new_board[4][4];
+char moving_board[4][4];
 char board[4][4];
 
 char start_deck[] = {1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3};
 char current_deck[12];
+
+game_state state = playing;
+
+int move_state = 0;
+int move_x = 0;
+int move_y = 0;
 
 bool is_deck_empty(char* deck) {
 	return deck[0] == 0;
@@ -111,7 +123,11 @@ void draw_board() {
 			}
 
 			obj_set_attr(&test_objs[(y * 4) + x], ATTR0_SQUARE | ATTR0_8BPP | ATTR0_REG, ATTR1_SIZE_32, ATTR2_PALBANK(0) | ((board[x][y] - 1) * 32) | ATTR2_PRIO(1));
-			obj_set_pos(&test_objs[(y * 4) + x], 50 + (x * 27), 20 + (y * 32));
+			if (moving_board[x][y]) {
+				obj_set_pos(&test_objs[(y * 4) + x], 50 + (x * 27) + (move_x * move_state), 20 + (y * 32) + (move_y * move_state));
+			} else {
+				obj_set_pos(&test_objs[(y * 4) + x], 50 + (x * 27), 20 + (y * 32));
+			}
 		}
 	}
 
@@ -130,6 +146,7 @@ void attempt_move_tile(int x, int y, int x_n, int y_n) {
 	// if the spot is empty it's easy
 	if ((u8)new_board[x_n][y_n] == (u8)empty) {
 		new_board[x_n][y_n] = board[x][y];
+		moving_board[x][y] = 1;
 		//board[x][y] = empty;
 		return;
 	}
@@ -142,12 +159,14 @@ void attempt_move_tile(int x, int y, int x_n, int y_n) {
 			return;
 		}
 		new_board[x_n][y_n] = (board[x][y]) + 1;
+		moving_board[x][y] = 1;
 		return;
 	}
 
 	if ((board[x][y] == tile_1 && board[x_n][y_n] == tile_2) || \
 		(board[x][y] == tile_2 && board[x_n][y_n] == tile_1)) {
 		new_board[x_n][y_n] = tile_3;
+		moving_board[x][y] = 1;
 		return;
 	}
 
@@ -160,6 +179,7 @@ void attempt_move_tile(int x, int y, int x_n, int y_n) {
 void reset_board() {
 	memset(current_deck, 0, sizeof(current_deck));
 	memset(board, 0, sizeof(board));
+	memset(moving_board, 0, sizeof(board));
 
 	for (int i = 0; i < 9; i++) {
 		int cx, cy;
@@ -183,53 +203,65 @@ int main() {
 	REG_DISPCNT = DCNT_OBJ | DCNT_OBJ_1D;
 
 	reset_board();
-
 	while(1) {
 		vid_vsync();
 		key_poll();
-		if (key_hit(KEY_START)) {
-			reset_board();
-		}
 
-		if (key_hit(KEY_UP)) {
-			memset(new_board, 0, sizeof(new_board));
-			for(int x = 0; x < 4; x++) {
-				for (int y = 0; y < 4; y++) {
-					attempt_move_tile(x, y, x, y-1);
-				}
+		if (state == playing) {
+			if (key_hit(KEY_START)) {
+				reset_board();
 			}
-			//attempt_move(0, -1);
-			memcpy(board, new_board, sizeof(new_board));
 
-		} else if (key_hit(KEY_DOWN)) {
-			memset(new_board, 0, sizeof(new_board));
-			for(int x = 0; x < 4; x++) {
-				for (int y = 3; y >= 0; y--) {
-					attempt_move_tile(x, y, x, y+1);
+			if (key_hit(KEY_UP)) {
+				memset(new_board, 0, sizeof(new_board));
+				for(int x = 0; x < 4; x++) {
+					for (int y = 0; y < 4; y++) {
+						attempt_move_tile(x, y, x, y-1);
+						move_x = 0;
+						move_y = -1;
+					}
 				}
-			}
-			//attempt_move(0, -1);
-			memcpy(board, new_board, sizeof(new_board));
-			//attempt_move(0, 1);
-		} else if (key_hit(KEY_LEFT)) {
-			memset(new_board, 0, sizeof(new_board));
-			for(int x = 0; x < 4; x++) {
-				for (int y = 0; y < 4; y++) {
-					attempt_move_tile(x, y, x-1, y);
+				state = moving;
+			} else if (key_hit(KEY_DOWN)) {
+				memset(new_board, 0, sizeof(new_board));
+				for(int x = 0; x < 4; x++) {
+					for (int y = 3; y >= 0; y--) {
+						attempt_move_tile(x, y, x, y+1);
+						move_x = 0;
+						move_y = 1;
+					}
 				}
-			}
-			//attempt_move(0, -1);
-			memcpy(board, new_board, sizeof(new_board));
-			//attempt_move(-1, 0);
-		} else if (key_hit(KEY_RIGHT)) {
-			memset(new_board, 0, sizeof(new_board));
-			for(int x = 3; x >= 0; x--) {
-				for (int y = 0; y < 4; y++) {
-					attempt_move_tile(x, y, x+1, y);
+				state = moving;
+			} else if (key_hit(KEY_LEFT)) {
+				memset(new_board, 0, sizeof(new_board));
+				for(int x = 0; x < 4; x++) {
+					for (int y = 0; y < 4; y++) {
+						attempt_move_tile(x, y, x-1, y);
+						move_x = -1;
+						move_y = 0;
+					}
 				}
+				state = moving;
+			} else if (key_hit(KEY_RIGHT)) {
+				memset(new_board, 0, sizeof(new_board));
+				for(int x = 3; x >= 0; x--) {
+					for (int y = 0; y < 4; y++) {
+						attempt_move_tile(x, y, x+1, y);
+						move_x = 1;
+						move_y = 0;
+					}
+				}
+				state = moving;
 			}
-			//attempt_move(0, -1);
-			memcpy(board, new_board, sizeof(new_board));
+		} else if (state == moving) {
+			move_state += 3;
+			if (move_state == 21) {
+				state = playing;
+				memcpy(board, new_board, sizeof(new_board));
+				memset(moving_board, 0, sizeof(moving_board));
+
+				move_state = 0;
+			}
 		}
 		draw_board();
 	}
