@@ -38,6 +38,8 @@ char board[4][4];
 char start_deck[] = {1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3};
 char current_deck[12];
 
+game_tile next_tile = empty;
+
 game_state state = playing;
 
 int move_state = 0;
@@ -74,6 +76,24 @@ void shuffle_deck(char* deck, int len) {
 
 game_tile random_game_tile() {
 	game_tile cur_tile = empty;
+
+	bool bonus = false;
+	game_tile highest = empty;
+	for (int x = 0; x < 4; x++) {
+		for (int y = 0; y < 4; y++) {
+			if (board[x][y] >= tile_48) {
+				bonus = true;
+			}
+			if (board[x][y] > highest) {
+				highest = board[x][y];
+			}
+		}
+	}
+
+	if (bonus && (qran_range(0, 20) == 0)) {
+		int size = highest - tile_24;
+		return tile_24 + qran_range(1, size+1);
+	}
 
 	// if the deck is empty then bring in the starter deck and shuffle it
 	if (is_deck_empty(current_deck))
@@ -131,12 +151,13 @@ void draw_board() {
 		}
 	}
 
-	oam_copy(oam_mem, test_objs, 4 * 4);
+	obj_set_attr(&test_objs[(4 * 4)], ATTR0_SQUARE | ATTR0_8BPP | ATTR0_REG, ATTR1_SIZE_32, ATTR2_PALBANK(0) | ((next_tile - 1) * 32) | ATTR2_PRIO(1));
+	obj_set_pos(&test_objs[(4 * 4)], 20, 20 + (1 * 32));
+
+	oam_copy(oam_mem, test_objs, (4 * 4) + 1);
 }
 
 void attempt_move_tile(int x, int y, int x_n, int y_n) {
-	//memset(new_board, 0, sizeof(new_board));
-
 	// we're trying to move beyond the edge of the screen
 	if (x_n < 0 || x_n > 3 || y_n < 0 || y_n > 3) {
 		new_board[x][y] = board[x][y];
@@ -147,6 +168,7 @@ void attempt_move_tile(int x, int y, int x_n, int y_n) {
 	if ((u8)new_board[x_n][y_n] == (u8)empty) {
 		new_board[x_n][y_n] = board[x][y];
 		moving_board[x][y] = 1;
+		state = moving;
 		//board[x][y] = empty;
 		return;
 	}
@@ -160,6 +182,7 @@ void attempt_move_tile(int x, int y, int x_n, int y_n) {
 		}
 		new_board[x_n][y_n] = (board[x][y]) + 1;
 		moving_board[x][y] = 1;
+		state = moving;
 		return;
 	}
 
@@ -167,13 +190,13 @@ void attempt_move_tile(int x, int y, int x_n, int y_n) {
 		(board[x][y] == tile_2 && board[x_n][y_n] == tile_1)) {
 		new_board[x_n][y_n] = tile_3;
 		moving_board[x][y] = 1;
+		state = moving;
 		return;
 	}
 
 	if (board[x][y] != board[x_n][y_n]) {
 		new_board[x][y] = board[x][y];
 	}
-	//memcpy(board, new_board, sizeof(new_board));
 }
 
 void reset_board() {
@@ -190,6 +213,8 @@ void reset_board() {
 
 		board[cx][cy] = random_game_tile();
 	}
+
+	next_tile = random_game_tile();
 }
 
 int main() {
@@ -221,7 +246,6 @@ int main() {
 						move_y = -1;
 					}
 				}
-				state = moving;
 			} else if (key_hit(KEY_DOWN)) {
 				memset(new_board, 0, sizeof(new_board));
 				for(int x = 0; x < 4; x++) {
@@ -231,7 +255,6 @@ int main() {
 						move_y = 1;
 					}
 				}
-				state = moving;
 			} else if (key_hit(KEY_LEFT)) {
 				memset(new_board, 0, sizeof(new_board));
 				for(int x = 0; x < 4; x++) {
@@ -241,7 +264,6 @@ int main() {
 						move_y = 0;
 					}
 				}
-				state = moving;
 			} else if (key_hit(KEY_RIGHT)) {
 				memset(new_board, 0, sizeof(new_board));
 				for(int x = 3; x >= 0; x--) {
@@ -251,7 +273,6 @@ int main() {
 						move_y = 0;
 					}
 				}
-				state = moving;
 			}
 		} else if (state == moving) {
 			move_state += 3;
@@ -259,7 +280,30 @@ int main() {
 				state = playing;
 				memcpy(board, new_board, sizeof(new_board));
 				memset(moving_board, 0, sizeof(moving_board));
-
+				int new_cood = 0;
+				// new tile goes on bottom row
+				if (move_y == -1) {
+					do {
+						new_cood = qran_range(0, 4);
+					} while(board[new_cood][3]);
+					board[new_cood][3] = next_tile;
+				} else if (move_y == 1) { // new tile goes on the top row
+					do {
+						new_cood = qran_range(0, 4);
+					} while(board[new_cood][0]);
+					board[new_cood][0] = next_tile;
+				} else if (move_x == -1) { // new tile goes on the right side
+					do {
+						new_cood = qran_range(0, 4);
+					} while(board[3][new_cood]);
+					board[3][new_cood] = next_tile;
+				} else if (move_x == 1) { // new tile goes on the left side
+					do {
+						new_cood = qran_range(0, 4);
+					} while(board[0][new_cood]);
+					board[0][new_cood] = next_tile;
+				}
+				next_tile = random_game_tile();
 				move_state = 0;
 			}
 		}
