@@ -8,6 +8,8 @@
 
 #include "sprites.h"
 #include "bg_tiles.h"
+#include "menu_tiles.h"
+#include "title_screen.h"
 
 typedef enum _game_tile {
 	empty,
@@ -28,6 +30,7 @@ typedef enum _game_tile {
 } game_tile;
 
 typedef enum _game_state {
+	menu,
 	playing,
 	moving
 } game_state;
@@ -41,14 +44,20 @@ char current_deck[12];
 
 game_tile next_tile = empty;
 
-game_state state = playing;
+game_state state;
 
 int move_state = 0;
 int move_x = 0;
 int move_y = 0;
 
-#define SCREEN_NUM 4
-SCR_ENTRY *bg0_map = se_mem[SCREEN_NUM];
+
+// menu state
+int selected_item = 0;
+
+#define MENU_SCREEN_NUM 4
+#define GAME_SCREEN_NUM 6
+SCR_ENTRY *bg0_map = se_mem[MENU_SCREEN_NUM];
+SCR_ENTRY *bg1_map = se_mem[GAME_SCREEN_NUM];
 
 bool is_deck_empty(char* deck) {
 	return deck[0] == 0;
@@ -133,10 +142,46 @@ void oam_init(OBJ_ATTR *obj, uint count)
 
 OBJ_ATTR test_objs[128];
 
-typedef struct _POS2D {
-	short x;
-	short y;
-} POS2D;
+void draw_background() {
+	REG_BG1CNT = BG_CBB(0) | BG_SBB(GAME_SCREEN_NUM) | BG_4BPP;
+	REG_BG1HOFS = 0;
+	REG_BG1VOFS = 0;
+
+	// top border
+	bg1_map[(1 * 32) + 8] = SE_PALBANK(0) | 1;
+	for (int i = 0; i < 12; i++) {
+		bg1_map[(1 * 32) + 9 + i] = SE_PALBANK(0) | 2;
+	}
+	bg1_map[(1 * 32) + 21] = SE_PALBANK(0) | 3;
+
+	bg1_map[(2 * 32) + 8] = SE_PALBANK(0) | 4;
+	for (int i = 0; i < 12; i++) {
+		bg1_map[(2 * 32) + 9 + i] = SE_PALBANK(0) | 5;
+	}
+	bg1_map[(2 * 32) + 21] = SE_PALBANK(0) | 6;
+
+
+	for (int y = 0; y < 14; y++) {
+		bg1_map[((3 + y) * 32) + 8] = SE_PALBANK(0) | 12;
+		bg1_map[((3 + y) * 32) + 21] = SE_PALBANK(0) | 13;
+		for (int x = 0; x < 12; x++) {
+			bg1_map[((3 + y) * 32) + 9 + x] = SE_PALBANK(0) | 5;
+		}
+	}
+
+	bg1_map[(17 * 32) + 8] = SE_PALBANK(0) | 7;
+	bg1_map[(17 * 32) + 21] = SE_PALBANK(0) | 8;
+	for (int i = 0; i < 12; i++) {
+		bg1_map[(17 * 32) + 9 + i] = SE_PALBANK(0) | 5;
+	}
+
+	// bottom border
+	bg1_map[(18 * 32) + 8] = SE_PALBANK(0) | 9;
+	for (int i = 0; i < 12; i++) {
+		bg1_map[(18 * 32) + 9 + i] = SE_PALBANK(0) | 10;
+	}
+	bg1_map[(18 * 32) + 21] = SE_PALBANK(0) | 11;
+}
 
 void draw_board() {
 	for (int x = 0; x < 4; x++) {
@@ -245,12 +290,31 @@ bool is_game_over() {
 	return true;
 }
 
+int pow(int base, int exp)
+{
+	if(exp < 0)
+		return -1;
+
+	int result = 1;
+	while (exp)
+	{
+		if (exp & 1)
+			result *= base;
+		exp >>= 1;
+		base *= base;
+	}
+
+	return result;
+}
+
 int score_tile(game_tile tile) {
 	// hardcode the rules for the first few
 	if (tile < tile_3) {
 		return 0;
 	}
-	int pow = tile - tile_2;
+	int power = tile - tile_2;
+
+	return pow(3, power);
 }
 
 void reset_board() {
@@ -271,8 +335,83 @@ void reset_board() {
 	next_tile = random_game_tile();
 }
 
-int main() {
-	vu8* vram = MEM_VRAM;
+void initialize_menu() {
+	vid_vsync();
+	// copy the menu tiles in
+	dma3_cpy(MEM_VRAM, menu_tilesTiles, menu_tilesTilesLen);
+	dma3_cpy(MEM_VRAM, title_screenTiles, title_screenTilesLen);
+
+	// copy the menu tile pal
+	//dma3_cpy(MEM_PAL, menu_tilesPal, sizeof(u16) * 16);
+	dma3_cpy(MEM_PAL, title_screenPal, sizeof(u16) * 16);
+
+	// clear the map
+	//memset16(bg0_map, 4, 240 * 160);
+	dma3_cpy(bg0_map, title_screenMap, sizeof(title_screenMap));
+
+/*
+	// draw the threes logo
+	for(int x = 0; x < 12; x++) {
+		for (int y = 0; y < 4; y++) {
+			bg0_map[((y + 4) * 32) + (x + 9)] = SE_PALBANK(0) | ((y * 12) + x);
+
+		}
+	}
+
+	// draw the GBA subtitle x 13, y 8
+	bg0_map[(8 * 32) + 13] = 48;
+	bg0_map[(8 * 32) + 14] = 49;
+	bg0_map[(8 * 32) + 15] = 50;
+	bg0_map[(8 * 32) + 16] = 51;
+
+	bg0_map[(9 * 32) + 13] = 60;
+	bg0_map[(9 * 32) + 14] = 61;
+	bg0_map[(9 * 32) + 15] = 62;
+	bg0_map[(9 * 32) + 16] = 63;
+
+	// draw the options
+	// New Game
+	bg0_map[(11 * 32) + 9] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 52;
+	bg0_map[(11 * 32) + 10] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 53;
+	bg0_map[(11 * 32) + 11] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 54;
+	bg0_map[(11 * 32) + 12] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 55;
+	bg0_map[(11 * 32) + 13] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 56;
+	bg0_map[(11 * 32) + 14] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 57;
+	bg0_map[(11 * 32) + 15] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 58;
+	bg0_map[(11 * 32) + 16] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 59;
+	bg0_map[(11 * 32) + 17] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 72;
+	bg0_map[(11 * 32) + 18] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 73;
+	bg0_map[(11 * 32) + 19] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 74;
+	bg0_map[(11 * 32) + 20] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 75;
+
+	bg0_map[(12 * 32) + 9] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 64;
+	bg0_map[(12 * 32) + 10] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 65;
+	bg0_map[(12 * 32) + 11] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 66;
+	bg0_map[(12 * 32) + 12] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 67;
+	bg0_map[(12 * 32) + 13] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 68;
+	bg0_map[(12 * 32) + 14] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 69;
+	bg0_map[(12 * 32) + 15] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 70;
+	bg0_map[(12 * 32) + 16] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 71;
+	bg0_map[(12 * 32) + 17] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 84;
+	bg0_map[(12 * 32) + 18] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 85;
+	bg0_map[(12 * 32) + 19] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 86;
+	bg0_map[(12 * 32) + 20] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 87;
+	// High Scores
+	*/
+
+	REG_BG0CNT = BG_CBB(0) | BG_SBB(MENU_SCREEN_NUM) | BG_4BPP;
+	REG_BG0HOFS = 0;
+	REG_BG0VOFS = 0;
+
+	REG_DISPCNT = DCNT_MODE0 | DCNT_BG0;
+}
+
+void initialize_display() {
+	vid_vsync();
+	// clear the palatte memory before loading
+	memset16(MEM_PAL, 0, 0x100);
+
+	memset16(bg1_map, 0, 0x400);
 
 	// copy the tiles in
 	dma3_cpy(MEM_VRAM, bg_tilesTiles, bg_tilesTilesLen);
@@ -280,60 +419,48 @@ int main() {
 	// copy the tiles pal in
 	dma3_cpy(MEM_PAL, bg_tilesPal, 0x10);
 
-	REG_BG0CNT = BG_CBB(0) | BG_SBB(SCREEN_NUM) | BG_4BPP;
-	REG_BG0HOFS = 0;
-	REG_BG0VOFS = 0;
-
-	// top border
-	bg0_map[(1 * 32) + 8] = SE_PALBANK(0) | 1;
-	for (int i = 0; i < 12; i++) {
-		bg0_map[(1 * 32) + 9 + i] = SE_PALBANK(0) | 2;
-	}
-	bg0_map[(1 * 32) + 21] = SE_PALBANK(0) | 3;
-
-	bg0_map[(2 * 32) + 8] = SE_PALBANK(0) | 4;
-	for (int i = 0; i < 12; i++) {
-		bg0_map[(2 * 32) + 9 + i] = SE_PALBANK(0) | 5;
-	}
-	bg0_map[(2 * 32) + 21] = SE_PALBANK(0) | 6;
-
-
-	for (int y = 0; y < 14; y++) {
-		bg0_map[((3 + y) * 32) + 8] = SE_PALBANK(0) | 12;
-		bg0_map[((3 + y) * 32) + 21] = SE_PALBANK(0) | 13;
-		for (int x = 0; x < 12; x++) {
-			bg0_map[((3 + y) * 32) + 9 + x] = SE_PALBANK(0) | 5;
-		}
-	}
-
-	bg0_map[(17 * 32) + 8] = SE_PALBANK(0) | 7;
-	bg0_map[(17 * 32) + 21] = SE_PALBANK(0) | 8;
-	for (int i = 0; i < 12; i++) {
-		bg0_map[(17 * 32) + 9 + i] = SE_PALBANK(0) | 5;
-	}
-
-	// bottom border
-	bg0_map[(18 * 32) + 8] = SE_PALBANK(0) | 9;
-	for (int i = 0; i < 12; i++) {
-		bg0_map[(18 * 32) + 9 + i] = SE_PALBANK(0) | 10;
-	}
-	bg0_map[(18 * 32) + 21] = SE_PALBANK(0) | 11;
-
 	// load the sprites
 	dma3_cpy(&tile_mem[4][0], spritesTiles, spritesTilesLen);
 
-	vu8* pal = MEM_PAL;
+	// load the sprite palettes
 	dma3_cpy(pal_obj_mem, spritesPal, spritesPalLen);
 
+	draw_background();
+
 	oam_init(test_objs, 128);
-	REG_DISPCNT = DCNT_MODE0 | DCNT_BG0 | DCNT_OBJ | DCNT_OBJ_1D;
+	REG_DISPCNT = DCNT_MODE0 | DCNT_BG1 | DCNT_OBJ | DCNT_OBJ_1D;
+}
+
+void change_state(game_state new_state) {
+	switch(new_state) {
+		case menu:
+			initialize_menu();
+			break;
+		case playing:
+			initialize_display();
+			break;
+		default:
+			break;
+	}
+
+	state = new_state;
+}
+
+int main() {
+	vu8* vram = MEM_VRAM;
+
+	change_state(menu);
+
 
 	reset_board();
 	while(1) {
 		vid_vsync();
 		key_poll();
-
-		if (state == playing) {
+		if (state == menu) {
+			if (key_hit(KEY_START)) {
+				change_state(playing);
+			}
+		} else if (state == playing) {
 			if (key_hit(KEY_START)) {
 				reset_board();
 			}
