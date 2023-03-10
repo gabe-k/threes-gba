@@ -10,6 +10,7 @@
 #include "bg_tiles.h"
 #include "menu_tiles.h"
 #include "title_screen.h"
+#include "bizcat.h"
 
 typedef enum _game_tile {
 	empty,
@@ -54,10 +55,15 @@ int move_y = 0;
 // menu state
 int selected_item = 0;
 
+#define FONT_CBB 1
 #define MENU_SCREEN_NUM 4
 #define GAME_SCREEN_NUM 6
+#define FONT_SCREEN_NUM 16
+
+
 SCR_ENTRY *bg0_map = se_mem[MENU_SCREEN_NUM];
 SCR_ENTRY *bg1_map = se_mem[GAME_SCREEN_NUM];
+SCR_ENTRY *bg2_map = se_mem[FONT_SCREEN_NUM];
 
 bool is_deck_empty(char* deck) {
 	return deck[0] == 0;
@@ -143,7 +149,7 @@ void oam_init(OBJ_ATTR *obj, uint count)
 OBJ_ATTR test_objs[128];
 
 void draw_background() {
-	REG_BG1CNT = BG_CBB(0) | BG_SBB(GAME_SCREEN_NUM) | BG_4BPP;
+	REG_BG1CNT = BG_CBB(0) | BG_SBB(GAME_SCREEN_NUM) | BG_4BPP | BG_PRIO(1);
 	REG_BG1HOFS = 0;
 	REG_BG1VOFS = 0;
 
@@ -201,7 +207,7 @@ void draw_board() {
 	}
 
 	obj_set_attr(&test_objs[(4 * 4)], ATTR0_SQUARE | ATTR0_8BPP | ATTR0_REG, ATTR1_SIZE_32, ATTR2_PALBANK(0) | ((next_tile - 1) * 32) | ATTR2_PRIO(0));
-	obj_set_pos(&test_objs[(4 * 4)], 20, 16 + (1 * 32));
+	obj_set_pos(&test_objs[(4 * 4)], 16, 16 + (1 * 32));
 
 	oam_copy(oam_mem, test_objs, (4 * 4) + 1);
 }
@@ -335,6 +341,34 @@ void reset_board() {
 	next_tile = random_game_tile();
 }
 
+void draw_char(int x, int y, char c) {
+	bg2_map[(y * 32) + x] = SE_PALBANK(1) | (((c & 0xF0) << 1) | (c & 0xF));
+	bg2_map[((y+1) * 32) + x] = SE_PALBANK(1) | (((c & 0xF0) << 1) | (c & 0xF)) + 0x10;
+}
+
+void draw_string(int x, int y, char* s) {
+	while(*s) {
+		draw_char(x, y, *s);
+		x++;
+		s++;
+	}
+}
+
+void initialize_font()
+{
+	memset16(bg2_map, 13, 0x1000);
+
+	// cope the font tiles in
+	dma3_cpy(&tile_mem[FONT_CBB], bizcatTiles, bizcatTilesLen);
+
+	// copy da pal
+	dma3_cpy(MEM_PAL + (sizeof(u16) * 16), bizcatPal, sizeof(u16) * 16);
+
+	REG_BG2CNT = BG_CBB(FONT_CBB) | BG_SBB(FONT_SCREEN_NUM) | BG_4BPP | BG_PRIO(0);
+	REG_BG2HOFS = 0;
+	REG_BG2VOFS = 0;
+}
+
 void initialize_menu() {
 	vid_vsync();
 	// copy the menu tiles in
@@ -399,6 +433,7 @@ void initialize_menu() {
 	// High Scores
 	*/
 
+
 	REG_BG0CNT = BG_CBB(0) | BG_SBB(MENU_SCREEN_NUM) | BG_4BPP;
 	REG_BG0HOFS = 0;
 	REG_BG0VOFS = 0;
@@ -425,10 +460,17 @@ void initialize_display() {
 	// load the sprite palettes
 	dma3_cpy(pal_obj_mem, spritesPal, spritesPalLen);
 
+	// load the font
+	initialize_font();
+
+	//draw_string(22, 7, "Score");
+	draw_string(2, 4, "Next");
+
+
 	draw_background();
 
 	oam_init(test_objs, 128);
-	REG_DISPCNT = DCNT_MODE0 | DCNT_BG1 | DCNT_OBJ | DCNT_OBJ_1D;
+	REG_DISPCNT = DCNT_MODE0 | DCNT_BG1 | DCNT_BG2 | DCNT_OBJ | DCNT_OBJ_1D;
 }
 
 void change_state(game_state new_state) {
