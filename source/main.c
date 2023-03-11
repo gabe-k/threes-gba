@@ -264,7 +264,7 @@ inline bool is_valid_move(char t1, char t2) {
 	} else if ((t1 == tile_1 && t2 == tile_2) ||
 		(t1 == tile_2 && t2 == tile_1)) {
 		return true;
-	} else if (t1 == t2) {
+	} else if (t1 == t2 && t1 != tile_1 && t1 != tile_2) {
 		return true;
 	}
 	return false;
@@ -285,7 +285,8 @@ bool is_game_over() {
 				if (is_valid_move(cur_tile, board[x+1][y])) {
 					return false;
 				}		
-			} else if (y > 0) {
+			}
+			if (y > 0) {
 				if (is_valid_move(cur_tile, board[x][y-1])) {
 					return false;
 				}
@@ -353,6 +354,9 @@ void reset_board() {
 		board[cx][cy] = random_game_tile();
 	}
 
+	// clear the "Game over!" text
+	draw_string(10, 0, "          ");
+
 	next_tile = random_game_tile();
 }
 
@@ -402,57 +406,6 @@ void initialize_menu() {
 	// clear the map
 	//memset16(bg0_map, 4, 240 * 160);
 	dma3_cpy(bg0_map, title_screenMap, sizeof(title_screenMap));
-
-/*
-	// draw the threes logo
-	for(int x = 0; x < 12; x++) {
-		for (int y = 0; y < 4; y++) {
-			bg0_map[((y + 4) * 32) + (x + 9)] = SE_PALBANK(0) | ((y * 12) + x);
-
-		}
-	}
-
-	// draw the GBA subtitle x 13, y 8
-	bg0_map[(8 * 32) + 13] = 48;
-	bg0_map[(8 * 32) + 14] = 49;
-	bg0_map[(8 * 32) + 15] = 50;
-	bg0_map[(8 * 32) + 16] = 51;
-
-	bg0_map[(9 * 32) + 13] = 60;
-	bg0_map[(9 * 32) + 14] = 61;
-	bg0_map[(9 * 32) + 15] = 62;
-	bg0_map[(9 * 32) + 16] = 63;
-
-	// draw the options
-	// New Game
-	bg0_map[(11 * 32) + 9] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 52;
-	bg0_map[(11 * 32) + 10] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 53;
-	bg0_map[(11 * 32) + 11] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 54;
-	bg0_map[(11 * 32) + 12] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 55;
-	bg0_map[(11 * 32) + 13] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 56;
-	bg0_map[(11 * 32) + 14] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 57;
-	bg0_map[(11 * 32) + 15] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 58;
-	bg0_map[(11 * 32) + 16] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 59;
-	bg0_map[(11 * 32) + 17] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 72;
-	bg0_map[(11 * 32) + 18] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 73;
-	bg0_map[(11 * 32) + 19] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 74;
-	bg0_map[(11 * 32) + 20] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 75;
-
-	bg0_map[(12 * 32) + 9] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 64;
-	bg0_map[(12 * 32) + 10] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 65;
-	bg0_map[(12 * 32) + 11] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 66;
-	bg0_map[(12 * 32) + 12] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 67;
-	bg0_map[(12 * 32) + 13] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 68;
-	bg0_map[(12 * 32) + 14] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 69;
-	bg0_map[(12 * 32) + 15] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 70;
-	bg0_map[(12 * 32) + 16] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 71;
-	bg0_map[(12 * 32) + 17] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 84;
-	bg0_map[(12 * 32) + 18] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 85;
-	bg0_map[(12 * 32) + 19] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 86;
-	bg0_map[(12 * 32) + 20] = SE_PALBANK((selected_item == 0) ? 0 : 1) | 87;
-	// High Scores
-	*/
-
 
 	REG_BG0CNT = BG_CBB(0) | BG_SBB(MENU_SCREEN_NUM) | BG_4BPP;
 	REG_BG0HOFS = 0;
