@@ -5,6 +5,7 @@
 #include <tonc_video.h>
 #include <string.h>
 #include <stdbool.h>
+#include <stdlib.h>
 
 #include "sprites.h"
 #include "bg_tiles.h"
@@ -46,6 +47,9 @@ char current_deck[12];
 game_tile next_tile = empty;
 
 game_state state;
+
+int score = 0;
+char score_str[6];
 
 int move_state = 0;
 int move_x = 0;
@@ -323,6 +327,17 @@ int score_tile(game_tile tile) {
 	return pow(3, power);
 }
 
+int calculate_score() {
+	int res = 0;
+	for(int x = 0; x < 4; x++) {
+		for(int y = 0; y < 4; y++) {
+			res += score_tile(board[x][y]);
+		}
+	}
+
+	return res;
+}
+
 void reset_board() {
 	memset(current_deck, 0, sizeof(current_deck));
 	memset(board, 0, sizeof(board));
@@ -352,6 +367,11 @@ void draw_string(int x, int y, char* s) {
 		x++;
 		s++;
 	}
+}
+
+void draw_score() {
+	draw_string(22, 7, "Score");
+	draw_string(22, 9, score_str);
 }
 
 void initialize_font()
@@ -463,9 +483,9 @@ void initialize_display() {
 	// load the font
 	initialize_font();
 
-	//draw_string(22, 7, "Score");
+	// Drwa the next title and the score
 	draw_string(2, 4, "Next");
-
+	draw_score();
 
 	draw_background();
 
@@ -479,6 +499,9 @@ void change_state(game_state new_state) {
 			initialize_menu();
 			break;
 		case playing:
+			score = 0;
+			score_str[0] = '0';
+			score_str[1] = 0;
 			initialize_display();
 			break;
 		default:
@@ -574,6 +597,14 @@ int main() {
 					board[0][new_cood] = next_tile;
 				}
 				next_tile = random_game_tile();
+
+				score = calculate_score();
+				itoa(score, score_str, 10);
+				draw_score();
+
+				if (is_game_over()) {
+					draw_string(10, 0, "Game over!");
+				}
 
 				move_state = 0;
 			}
