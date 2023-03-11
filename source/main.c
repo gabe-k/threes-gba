@@ -356,6 +356,8 @@ void reset_board() {
 
 	// clear the "Game over!" text
 	draw_string(10, 0, "          ");
+	// clear the score text
+	draw_string(22, 9, "       ");
 
 	next_tile = random_game_tile();
 }
