@@ -429,17 +429,21 @@ void erase_box(int x, int y, int width, int height) {
 	}
 }
 
-void draw_char(int x, int y, char c) {
-	bg2_map[(y * 32) + x] = SE_PALBANK(1) | (((c & 0xF0) << 1) | (c & 0xF));
-	bg2_map[((y+1) * 32) + x] = SE_PALBANK(1) | (((c & 0xF0) << 1) | (c & 0xF)) + 0x10;
+void draw_char(int x, int y, char c, int pal) {
+	bg2_map[(y * 32) + x] = SE_PALBANK(pal) | (((c & 0xF0) << 1) | (c & 0xF));
+	bg2_map[((y+1) * 32) + x] = SE_PALBANK(pal) | (((c & 0xF0) << 1) | (c & 0xF)) + 0x10;
 }
 
-void draw_string(int x, int y, char* s) {
+void draw_string_ex(int x, int y, char* s, int pal) {
 	while(*s) {
-		draw_char(x, y, *s);
+		draw_char(x, y, *s, pal);
 		x++;
 		s++;
 	}
+}
+
+void draw_string(int x, int y, char* s) {
+	draw_string_ex(x, y, s, 1);
 }
 
 void draw_score() {
