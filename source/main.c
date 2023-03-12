@@ -45,6 +45,8 @@ char start_deck[] = {1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3};
 char current_deck[12];
 
 game_tile next_tile = empty;
+int new_tile_x = 0;
+int new_tile_y = 0;
 
 game_state state;
 
@@ -55,6 +57,7 @@ int move_state = 0;
 int move_x = 0;
 int move_y = 0;
 
+int tick = 0; // for seeding rng
 
 // menu state
 int selected_item = 0;
@@ -201,7 +204,7 @@ void draw_board() {
 				continue;
 			}
 
-			obj_set_attr(&test_objs[(y * 4) + x], ATTR0_SQUARE | ATTR0_8BPP | ATTR0_REG, ATTR1_SIZE_32, ATTR2_PALBANK(0) | ((board[x][y] - 1) * 32) | ATTR2_PRIO(0));
+			obj_set_attr(&test_objs[(y * 4) + x], ATTR0_SQUARE | ATTR0_8BPP | ATTR0_REG, ATTR1_SIZE_32, ATTR2_PALBANK(0) | ((board[x][y] - 1) * 32) | ATTR2_PRIO(2));
 			if (moving_board[x][y]) {
 				obj_set_pos(&test_objs[(y * 4) + x], 65 + (x * 26) + (move_x * move_state), 16 + (y * 32) + (move_y * move_state));
 			} else {
@@ -210,10 +213,23 @@ void draw_board() {
 		}
 	}
 
+	if (move_state > 0) {
+		obj_set_attr(&test_objs[(4 * 4) + 1], ATTR0_SQUARE | ATTR0_8BPP | ATTR0_REG, ATTR1_SIZE_32, ATTR2_PALBANK(0) | ((next_tile - 1) * 32) | ATTR2_PRIO(2));
+		if (move_x) {
+			obj_set_pos(&test_objs[(4 * 4) + 1], (65 + (26 * move_x * -1)) + (new_tile_x * 26) + (move_x * move_state), 16 + (new_tile_y * 32) + (move_y * move_state));
+		} else 
+		if (move_y) {
+			obj_set_pos(&test_objs[(4 * 4) + 1], 65 + (new_tile_x * 26) + (move_x * move_state), 16 + (32 * move_y * -1) + (new_tile_y * 32) + (move_y * move_state));
+		}
+
+	} else {
+		obj_hide(&test_objs[(4 * 4) + 1]);
+	}
+
 	obj_set_attr(&test_objs[(4 * 4)], ATTR0_SQUARE | ATTR0_8BPP | ATTR0_REG, ATTR1_SIZE_32, ATTR2_PALBANK(0) | ((next_tile - 1) * 32) | ATTR2_PRIO(0));
 	obj_set_pos(&test_objs[(4 * 4)], 16, 16 + (1 * 32));
 
-	oam_copy(oam_mem, test_objs, (4 * 4) + 1);
+	oam_copy(oam_mem, test_objs, (4 * 4) + 2);
 }
 
 void attempt_move_tile(int x, int y, int x_n, int y_n) {
@@ -403,13 +419,13 @@ void initialize_menu() {
 
 	// copy the menu tile pal
 	//dma3_cpy(MEM_PAL, menu_tilesPal, sizeof(u16) * 16);
-	dma3_cpy(MEM_PAL, title_screenPal, sizeof(u16) * 16);
+	dma3_cpy(MEM_PAL, title_screenPal, sizeof(u16) * 256);
 
 	// clear the map
 	//memset16(bg0_map, 4, 240 * 160);
-	dma3_cpy(bg0_map, title_screenMap, sizeof(title_screenMap));
+	dma3_cpy(bg0_map, title_screenMap, title_screenMapLen);
 
-	REG_BG0CNT = BG_CBB(0) | BG_SBB(MENU_SCREEN_NUM) | BG_4BPP;
+	REG_BG0CNT = BG_CBB(0) | BG_SBB(MENU_SCREEN_NUM) | BG_8BPP;
 	REG_BG0HOFS = 0;
 	REG_BG0VOFS = 0;
 
@@ -471,13 +487,14 @@ int main() {
 
 	change_state(menu);
 
-
-	reset_board();
 	while(1) {
 		vid_vsync();
 		key_poll();
+		tick++;
 		if (state == menu) {
 			if (key_hit(KEY_START)) {
+				sqran(tick);
+				reset_board();
 				change_state(playing);
 			}
 		} else if (state == playing) {
@@ -523,11 +540,43 @@ int main() {
 				}
 			}
 		} else if (state == moving) {
+			// pic the coods for the new tile on the first frame of movement
+			if (move_state == 0) {
+				int new_cood = 0;
+				// new tile goes on bottom row
+				if (move_y == -1) {
+					do {
+						new_cood = qran_range(0, 4);
+					} while(new_board[new_cood][3]);
+					new_tile_x = new_cood;
+					new_tile_y = 3;
+				} else if (move_y == 1) { // new tile goes on the top row
+					do {
+						new_cood = qran_range(0, 4);
+					} while(new_board[new_cood][0]);
+					new_tile_x = new_cood;
+					new_tile_y = 0;
+				} else if (move_x == -1) { // new tile goes on the right side
+					do {
+						new_cood = qran_range(0, 4);
+					} while(new_board[3][new_cood]);
+					new_tile_x = 3;
+					new_tile_y = new_cood;
+				} else if (move_x == 1) { // new tile goes on the left side
+					do {
+						new_cood = qran_range(0, 4);
+					} while(new_board[0][new_cood]);
+					new_tile_x = 0;
+					new_tile_y = new_cood;
+				}
+			}
+
 			move_state += 3;
+
 			if (move_state == 21) {
-				state = playing;
 				memcpy(board, new_board, sizeof(new_board));
 				memset(moving_board, 0, sizeof(moving_board));
+				/*
 				int new_cood = 0;
 				// new tile goes on bottom row
 				if (move_y == -1) {
@@ -551,7 +600,11 @@ int main() {
 					} while(board[0][new_cood]);
 					board[0][new_cood] = next_tile;
 				}
+				*/
+				board[new_tile_x][new_tile_y] = next_tile;
+
 				next_tile = random_game_tile();
+				
 
 				score = calculate_score();
 				itoa(score, score_str, 10);
@@ -562,6 +615,7 @@ int main() {
 				}
 
 				move_state = 0;
+				state = playing;
 			}
 		}
 		draw_board();
