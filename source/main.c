@@ -34,7 +34,8 @@ typedef enum _game_tile {
 typedef enum _game_state {
 	menu,
 	playing,
-	moving
+	moving,
+	game_over
 } game_state;
 
 char new_board[4][4];
@@ -378,6 +379,56 @@ void reset_board() {
 	next_tile = random_game_tile();
 }
 
+#define DIALOG_TOP_LEFT 14
+#define DIALOG_TOP_BORDER 15
+#define DIALOG_TOP_RIGHT 16
+#define DIALOG_LEFT_BORDER 17
+#define DIALOG_RIGHT_BORDER 18
+#define DIALOG_CENTER 0
+#define DIALOG_BOTTOM_LEFT 19
+#define DIALOG_BOTTOM_BORDER 20
+#define DIALOG_BOTTOM_RIGHT 21
+
+void draw_box(int x, int y, int width, int height) {
+	u8 cur_tile = 0;
+	for (int cx = 0; cx < width; cx++) {
+		for (int cy = 0; cy < height; cy++) {
+			if (cx == 0) {
+				if (cy == 0) {
+					cur_tile = DIALOG_TOP_LEFT;
+				} else if (cy == height - 1) {
+					cur_tile = DIALOG_BOTTOM_LEFT;
+				} else {
+					cur_tile = DIALOG_LEFT_BORDER;
+				}
+			} else if (cx == width - 1) {
+				if (cy == 0) {
+					cur_tile = DIALOG_TOP_RIGHT;
+				} else if (cy == height - 1) {
+					cur_tile = DIALOG_BOTTOM_RIGHT;
+				} else {
+					cur_tile = DIALOG_RIGHT_BORDER;
+				}
+			} else if (cy == 0) {
+				cur_tile = DIALOG_TOP_BORDER;
+			} else if (cy == height - 1) {
+				cur_tile = DIALOG_BOTTOM_BORDER;
+			} else {
+				cur_tile = DIALOG_CENTER;
+			}
+			bg1_map[((y + cy) * 32) + x + cx] = cur_tile;
+		}
+	}
+}
+
+void erase_box(int x, int y, int width, int height) {
+	for (int cx = 0; cx < width; cx++) {
+		for (int cy = 0; cy < height; cy++) {
+			bg1_map[((y + cy) * 32) + x + cx] = 5;
+		}
+	}
+}
+
 void draw_char(int x, int y, char c) {
 	bg2_map[(y * 32) + x] = SE_PALBANK(1) | (((c & 0xF0) << 1) | (c & 0xF));
 	bg2_map[((y+1) * 32) + x] = SE_PALBANK(1) | (((c & 0xF0) << 1) | (c & 0xF)) + 0x10;
@@ -500,6 +551,11 @@ int main() {
 		} else if (state == playing) {
 			if (key_hit(KEY_START)) {
 				reset_board();
+				// write to sram
+				sram_mem[0] = 'C';
+				sram_mem[1] = 'o';
+				sram_mem[2] = 'o';
+				sram_mem[3] = 'l';
 			}
 
 			if (key_hit(KEY_UP)) {
@@ -587,13 +643,25 @@ int main() {
 				itoa(score, score_str, 10);
 				draw_score();
 
-				// check if the game is over
-				if (is_game_over()) {
-					draw_string(10, 0, "Game over!");
-				}
-
 				// change the state back to playing
 				move_state = 0;
+				state = playing;
+
+				// check if the game is over
+				if (is_game_over()) {
+					draw_box(10, 4, 10, 6);
+					draw_string(13, 5, "GAME");
+					draw_string(13, 7, "OVER");
+					state = game_over;
+				}
+			}
+		} else if (state == game_over) {
+			if (key_hit(KEY_A)) {
+				// erase the game over box
+				erase_box(10, 4, 10, 6);
+				draw_string(13, 5, "    ");
+				draw_string(13, 7, "    ");
+				reset_board();
 				state = playing;
 			}
 		}
