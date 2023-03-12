@@ -483,8 +483,7 @@ void change_state(game_state new_state) {
 }
 
 int main() {
-	vu8* vram = MEM_VRAM;
-
+	// start the game to the menu
 	change_state(menu);
 
 	while(1) {
@@ -493,7 +492,8 @@ int main() {
 		tick++;
 		if (state == menu) {
 			if (key_hit(KEY_START)) {
-				sqran(tick);
+				sqran(tick); // seed the rng with the number of frames spent at the title screen
+
 				reset_board();
 				change_state(playing);
 			}
@@ -574,46 +574,25 @@ int main() {
 			move_state += 3;
 
 			if (move_state == 21) {
+				// update the actual board
 				memcpy(board, new_board, sizeof(new_board));
 				memset(moving_board, 0, sizeof(moving_board));
-				/*
-				int new_cood = 0;
-				// new tile goes on bottom row
-				if (move_y == -1) {
-					do {
-						new_cood = qran_range(0, 4);
-					} while(board[new_cood][3]);
-					board[new_cood][3] = next_tile;
-				} else if (move_y == 1) { // new tile goes on the top row
-					do {
-						new_cood = qran_range(0, 4);
-					} while(board[new_cood][0]);
-					board[new_cood][0] = next_tile;
-				} else if (move_x == -1) { // new tile goes on the right side
-					do {
-						new_cood = qran_range(0, 4);
-					} while(board[3][new_cood]);
-					board[3][new_cood] = next_tile;
-				} else if (move_x == 1) { // new tile goes on the left side
-					do {
-						new_cood = qran_range(0, 4);
-					} while(board[0][new_cood]);
-					board[0][new_cood] = next_tile;
-				}
-				*/
 				board[new_tile_x][new_tile_y] = next_tile;
 
+				// select the new next tile
 				next_tile = random_game_tile();
 				
-
+				// calculate and draw the score
 				score = calculate_score();
 				itoa(score, score_str, 10);
 				draw_score();
 
+				// check if the game is over
 				if (is_game_over()) {
 					draw_string(10, 0, "Game over!");
 				}
 
+				// change the state back to playing
 				move_state = 0;
 				state = playing;
 			}
