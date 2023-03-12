@@ -63,6 +63,14 @@ int tick = 0; // for seeding rng
 // menu state
 int selected_item = 0;
 
+typedef struct _menu_item {
+	int x;
+	int y;
+	char* str;
+} menu_item;
+
+menu_item menu_items[] = { {13, 11, "Play"}, {10, 14, "High Scores"} };
+
 #define FONT_CBB 1
 #define MENU_SCREEN_NUM 4
 #define GAME_SCREEN_NUM 6
@@ -466,6 +474,18 @@ void initialize_font()
 	REG_BG2VOFS = 0;
 }
 
+void draw_menu_items() {
+	for (int i = 0; i < sizeof(menu_items) / sizeof(menu_item); i++) {
+		if (i == selected_item) {
+			draw_char(menu_items[i].x - 2, menu_items[i].y, 0x11, 1);
+		} else {
+			draw_char(menu_items[i].x - 2, menu_items[i].y, ' '
+				, 1);
+		}
+		draw_string(menu_items[i].x, menu_items[i].y, menu_items[i].str);
+	}
+}
+
 void initialize_menu() {
 	vid_vsync();
 	// copy the menu tiles in
@@ -476,15 +496,19 @@ void initialize_menu() {
 	//dma3_cpy(MEM_PAL, menu_tilesPal, sizeof(u16) * 16);
 	dma3_cpy(MEM_PAL, title_screenPal, sizeof(u16) * 256);
 
+	// load the font
+	initialize_font();
+
 	// clear the map
 	//memset16(bg0_map, 4, 240 * 160);
 	dma3_cpy(bg0_map, title_screenMap, title_screenMapLen);
+	draw_menu_items();
 
-	REG_BG0CNT = BG_CBB(0) | BG_SBB(MENU_SCREEN_NUM) | BG_8BPP;
+	REG_BG0CNT = BG_CBB(0) | BG_SBB(MENU_SCREEN_NUM) | BG_8BPP | BG_PRIO(1);
 	REG_BG0HOFS = 0;
 	REG_BG0VOFS = 0;
 
-	REG_DISPCNT = DCNT_MODE0 | DCNT_BG0;
+	REG_DISPCNT = DCNT_MODE0 | DCNT_BG2 | DCNT_BG0;
 }
 
 void initialize_display() {
@@ -506,8 +530,7 @@ void initialize_display() {
 	// load the sprite palettes
 	dma3_cpy(pal_obj_mem, spritesPal, spritesPalLen);
 
-	// load the font
-	initialize_font();
+	memset16(bg2_map, 13, 0x1000);
 
 	// Drwa the next title and the score
 	draw_string(2, 4, "Next");
@@ -522,6 +545,7 @@ void initialize_display() {
 void change_state(game_state new_state) {
 	switch(new_state) {
 		case menu:
+			memset16(bg2_map, 13, 0x1000);
 			initialize_menu();
 			break;
 		case playing:
@@ -546,12 +570,31 @@ int main() {
 		key_poll();
 		tick++;
 		if (state == menu) {
-			if (key_hit(KEY_START)) {
-				sqran(tick); // seed the rng with the number of frames spent at the title screen
 
-				reset_board();
-				change_state(playing);
+
+			// scroll down
+			if (key_hit(KEY_DOWN)) {
+				if (selected_item + 1 < sizeof(menu_items) / sizeof(menu_item)) {
+					selected_item++;
+				}
+			} else if (key_hit(KEY_UP)) {
+				if (selected_item > 0) {
+					selected_item--;
+				}
+			} else if (key_hit(KEY_A)) {
+				// do the action for the selected menu option
+				switch(selected_item) {
+					case 0:
+						sqran(tick); // seed the rng with the number of frames spent at the title screen
+						reset_board();
+						change_state(playing);
+						continue;
+						break;
+					default:
+						break;
+				}
 			}
+			draw_menu_items();
 		} else if (state == playing) {
 			if (key_hit(KEY_START)) {
 				reset_board();
@@ -560,6 +603,9 @@ int main() {
 				sram_mem[1] = 'o';
 				sram_mem[2] = 'o';
 				sram_mem[3] = 'l';
+			} else if (key_hit(KEY_SELECT)) {
+				change_state(menu);
+				continue;
 			}
 
 			if (key_hit(KEY_UP)) {
