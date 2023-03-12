@@ -35,7 +35,8 @@ typedef enum _game_state {
 	menu,
 	playing,
 	moving,
-	game_over
+	game_over,
+	high_score_list
 } game_state;
 
 char new_board[4][4];
@@ -69,7 +70,17 @@ typedef struct _menu_item {
 	char* str;
 } menu_item;
 
-menu_item menu_items[] = { {13, 11, "Play"}, {10, 14, "High Scores"} };
+const menu_item menu_items[] = { {13, 11, "Play"}, {10, 14, "High Scores"} };
+
+// save data
+typedef struct _high_score_entry {
+	char name[10];
+	int score;
+} high_score_entry;
+
+high_score_entry high_scores[5];
+
+#define MAGIC_OFFSET
 
 #define FONT_CBB 1
 #define MENU_SCREEN_NUM 4
@@ -387,6 +398,27 @@ void reset_board() {
 	next_tile = random_game_tile();
 }
 
+void load_save() {
+	// check for the magic
+	if (sram_mem[0] != 'G' || sram_mem[1] != 'a' || sram_mem[2] != 'b' || sram_mem[3] != 'e') {
+		sram_mem[0] = 'G';
+		sram_mem[1] = 'a';
+		sram_mem[2] = 'b';
+		sram_mem[3] = 'e';
+
+		memset(high_scores, 0, sizeof(high_scores));
+		memcpy(sram_mem + sizeof(u32), high_scores, sizeof(high_scores));
+		return;
+	}
+
+	//memcpy(high_scores, sram_mem + 4, sizeof(high_scores));
+	vu8* v_sram = (vu8*)sram_mem;
+	u8* high_scores_ptr = (u8*)high_scores;
+	for (int i = 0; i < sizeof(high_scores); i++) {
+		high_scores_ptr[i] = v_sram[i+4];
+	}
+}
+
 #define DIALOG_TOP_LEFT 14
 #define DIALOG_TOP_BORDER 15
 #define DIALOG_TOP_RIGHT 16
@@ -554,6 +586,10 @@ void change_state(game_state new_state) {
 			score_str[1] = 0;
 			initialize_display();
 			break;
+		case high_score_list:
+			memset16(bg2_map, 13, 0x1000);
+			REG_DISPCNT = DCNT_MODE0 | DCNT_BG2;
+			break;
 		default:
 			break;
 	}
@@ -561,7 +597,52 @@ void change_state(game_state new_state) {
 	state = new_state;
 }
 
+// checks if our score goes in the leaderboard
+bool is_high_score(int score) {
+	for (int i = 0; i < sizeof(high_scores) / sizeof(high_score_entry); i++) {
+		if (score > high_scores[i].score) {
+			return true;
+		}
+	}
+	return false;
+}
+
+void insert_high_score(high_score_entry* new_entry) {
+	high_score_entry temps[sizeof(high_scores) / sizeof(high_score_entry)];
+	for (int i = 0; i < sizeof(high_scores) / sizeof(high_score_entry); i++) {
+		if (new_entry->score > high_scores[i].score) {
+			//memcpy(temps, &high_scores[i], (sizeof(high_scores) / sizeof(high_score_entry) - i - 1) *  sizeof(high_scores));
+			//memcpy(&high_scores[i+1], temps, (sizeof(high_scores) / sizeof(high_score_entry) - i - 1) *  sizeof(high_scores));
+			/*for(int j = sizeof(high_scores) / sizeof(high_score_entry) - 1; j > i; j++) {
+				high_scores[j] = high_scores[j - 1];
+			}*/
+			memmove(&high_scores[i+1], &high_scores[i], ((sizeof(high_scores) / sizeof(high_score_entry) - 1 - i) * sizeof(high_score_entry)));
+			memcpy(&high_scores[i], new_entry, sizeof(high_score_entry));
+			break;
+		}
+	}
+
+	//memcpy(sram_mem + 4, high_scores, sizeof(high_scores));
+	vu8* v_sram = (vu8*)sram_mem;
+	u8* high_scores_ptr = (u8*)high_scores;
+	for (int i = 0; i < sizeof(high_scores); i++) {
+		v_sram[i+4] = high_scores_ptr[i];
+	}
+}
+
+void draw_high_scores() {
+	char cur_score[6];
+	for (int i = 0; i < sizeof(high_scores) / sizeof(high_score_entry); i++) {
+		draw_string(3, 4 + (i * 3), high_scores[i].name);
+		itoa(high_scores[i].score, cur_score, 10);
+		draw_string(23, 4 + (i * 3), cur_score);
+	}
+}
+
 int main() {
+	// load save data
+	load_save();
+
 	// start the game to the menu
 	change_state(menu);
 
@@ -570,8 +651,6 @@ int main() {
 		key_poll();
 		tick++;
 		if (state == menu) {
-
-
 			// scroll down
 			if (key_hit(KEY_DOWN)) {
 				if (selected_item + 1 < sizeof(menu_items) / sizeof(menu_item)) {
@@ -584,25 +663,29 @@ int main() {
 			} else if (key_hit(KEY_A)) {
 				// do the action for the selected menu option
 				switch(selected_item) {
-					case 0:
+					case 0: // play game
 						sqran(tick); // seed the rng with the number of frames spent at the title screen
 						reset_board();
 						change_state(playing);
 						continue;
 						break;
+					case 1: // high scores
+						change_state(high_score_list);
+						continue;
 					default:
 						break;
 				}
 			}
 			draw_menu_items();
+		} else if (state == high_score_list) {
+			draw_high_scores();
+			if (key_hit(KEY_B)) {
+				change_state(menu);
+				continue;
+			}
 		} else if (state == playing) {
 			if (key_hit(KEY_START)) {
 				reset_board();
-				// write to sram
-				sram_mem[0] = 'C';
-				sram_mem[1] = 'o';
-				sram_mem[2] = 'o';
-				sram_mem[3] = 'l';
 			} else if (key_hit(KEY_SELECT)) {
 				change_state(menu);
 				continue;
@@ -702,6 +785,13 @@ int main() {
 					draw_box(10, 4, 10, 6);
 					draw_string(13, 5, "GAME");
 					draw_string(13, 7, "OVER");
+					if (is_high_score(score)) {
+						high_score_entry new_score;
+						strcpy(new_score.name, "gabe_k"); // temp
+						new_score.score = score;
+						insert_high_score(&new_score
+							);
+					}
 					state = game_over;
 				}
 			}
