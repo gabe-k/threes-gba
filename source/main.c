@@ -36,7 +36,8 @@ typedef enum _game_state {
 	playing,
 	moving,
 	game_over,
-	high_score_list
+	high_score_list,
+	entering_name
 } game_state;
 
 char new_board[4][4];
@@ -80,6 +81,9 @@ typedef struct _high_score_entry {
 
 high_score_entry high_scores[5];
 
+char name_input[10];
+int name_input_index = 0;
+
 #define MAGIC_OFFSET
 
 #define FONT_CBB 1
@@ -91,6 +95,8 @@ high_score_entry high_scores[5];
 SCR_ENTRY *bg0_map = se_mem[MENU_SCREEN_NUM];
 SCR_ENTRY *bg1_map = se_mem[GAME_SCREEN_NUM];
 SCR_ENTRY *bg2_map = se_mem[FONT_SCREEN_NUM];
+
+#define SET_TILE(m, x, y, t, p) (m[(y * 32) + x] = SE_PALBANK(p) | t)
 
 bool is_deck_empty(char* deck) {
 	return deck[0] == 0;
@@ -611,11 +617,6 @@ void insert_high_score(high_score_entry* new_entry) {
 	high_score_entry temps[sizeof(high_scores) / sizeof(high_score_entry)];
 	for (int i = 0; i < sizeof(high_scores) / sizeof(high_score_entry); i++) {
 		if (new_entry->score > high_scores[i].score) {
-			//memcpy(temps, &high_scores[i], (sizeof(high_scores) / sizeof(high_score_entry) - i - 1) *  sizeof(high_scores));
-			//memcpy(&high_scores[i+1], temps, (sizeof(high_scores) / sizeof(high_score_entry) - i - 1) *  sizeof(high_scores));
-			/*for(int j = sizeof(high_scores) / sizeof(high_score_entry) - 1; j > i; j++) {
-				high_scores[j] = high_scores[j - 1];
-			}*/
 			memmove(&high_scores[i+1], &high_scores[i], ((sizeof(high_scores) / sizeof(high_score_entry) - 1 - i) * sizeof(high_score_entry)));
 			memcpy(&high_scores[i], new_entry, sizeof(high_score_entry));
 			break;
@@ -633,9 +634,35 @@ void insert_high_score(high_score_entry* new_entry) {
 void draw_high_scores() {
 	char cur_score[6];
 	for (int i = 0; i < sizeof(high_scores) / sizeof(high_score_entry); i++) {
-		draw_string(3, 4 + (i * 3), high_scores[i].name);
+		if (high_scores[i].name[0] == 0) {
+			draw_string(3, 4 + (i * 3), "_________");
+		} else {
+			draw_string(3, 4 + (i * 3), high_scores[i].name);
+		}
 		itoa(high_scores[i].score, cur_score, 10);
 		draw_string(23, 4 + (i * 3), cur_score);
+	}
+}
+
+void draw_name_input() {
+// high score is drawn at x 10, y 5
+#define UP_ARROW_TILE (546 - 512)
+#define DOWN_ARROW_TILE (563 - 512)
+	for(int i = 0; i <= name_input_index; i++) {
+		// do or do not draw the arrows
+		if (i != name_input_index) {
+			SET_TILE(bg2_map, 10 + i, 7, 0x40, 1);
+			SET_TILE(bg2_map, 10 + i, 10, 0x40, 1);
+		} else {
+			SET_TILE(bg2_map, 10 + i, 7, UP_ARROW_TILE, 1);
+			SET_TILE(bg2_map, 10 + i, 10, DOWN_ARROW_TILE, 1);
+		}
+
+		if (name_input[i]) {
+			draw_char(10 + i, 8, name_input[i], 1);
+		} else {
+			draw_char(10 + i, 8, '_', 1);
+		}
 	}
 }
 
@@ -782,15 +809,20 @@ int main() {
 
 				// check if the game is over
 				if (is_game_over()) {
-					draw_box(10, 4, 10, 6);
-					draw_string(13, 5, "GAME");
-					draw_string(13, 7, "OVER");
 					if (is_high_score(score)) {
-						high_score_entry new_score;
-						strcpy(new_score.name, "gabe_k"); // temp
-						new_score.score = score;
-						insert_high_score(&new_score
-							);
+						draw_box(9, 4, 12, 8);
+						draw_string(10, 5, "High score");
+						state = entering_name;
+						memset(name_input, 0, sizeof(name_input));
+						name_input_index = 0;
+						continue;
+						//strcpy(new_score.name, "gabe_k"); // temp
+						//new_score.score = score;
+						//insert_high_score(&new_score);
+					} else {
+						draw_box(10, 4, 10, 6);
+						draw_string(13, 5, "GAME");
+						draw_string(13, 7, "OVER");
 					}
 					state = game_over;
 				}
@@ -803,6 +835,32 @@ int main() {
 				draw_string(13, 7, "    ");
 				reset_board();
 				state = playing;
+			}
+		} else if (state == entering_name) {
+			draw_name_input();
+			if (key_hit(KEY_UP)) {
+				if (name_input[name_input_index]) {
+					name_input[name_input_index] += 1;
+				} else {
+					name_input[name_input_index] = 'A'; // we're on a null char then just at A
+				}
+			} else if (key_hit(KEY_DOWN)) {
+				if (name_input[name_input_index]) {
+					name_input[name_input_index] -= 1;
+				} else {
+					name_input[name_input_index] = '9'; // we're on a null char then just at 9
+				}		
+			}
+			if (key_hit(KEY_A)) {
+				name_input_index += 1;
+			}
+			if (key_hit(KEY_START)) {
+				high_score_entry new_score;
+				memcpy(new_score.name, name_input, sizeof(name_input));
+				new_score.score = score;
+				insert_high_score(&new_score);
+				change_state(high_score_list);
+				continue;
 			}
 		}
 		draw_board();
