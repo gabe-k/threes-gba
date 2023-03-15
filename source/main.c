@@ -343,7 +343,7 @@ bool is_game_over() {
 	return true;
 }
 
-int pow(int base, int exp)
+int pow_int(int base, int exp)
 {
 	if(exp < 0)
 		return -1;
@@ -367,7 +367,7 @@ int score_tile(game_tile tile) {
 	}
 	int power = tile - tile_2;
 
-	return pow(3, power);
+	return pow_int(3, power);
 }
 
 int calculate_score() {
@@ -379,6 +379,28 @@ int calculate_score() {
 	}
 
 	return res;
+}
+
+void draw_char(int x, int y, char c, int pal) {
+	bg2_map[(y * 32) + x] = SE_PALBANK(pal) | (((c & 0xF0) << 1) | (c & 0xF));
+	bg2_map[((y+1) * 32) + x] = SE_PALBANK(pal) | ((c & 0xF0) << 1) | ((c & 0xF) + 0x10);
+}
+
+void draw_string_ex(int x, int y, char* s, int pal) {
+	while(*s) {
+		draw_char(x, y, *s, pal);
+		x++;
+		s++;
+	}
+}
+
+void draw_string(int x, int y, char* s) {
+	draw_string_ex(x, y, s, 1);
+}
+
+void draw_score() {
+	draw_string(22, 7, "Score");
+	draw_string(22, 9, score_str);
 }
 
 void reset_board() {
@@ -475,28 +497,6 @@ void erase_box(int x, int y, int width, int height) {
 	}
 }
 
-void draw_char(int x, int y, char c, int pal) {
-	bg2_map[(y * 32) + x] = SE_PALBANK(pal) | (((c & 0xF0) << 1) | (c & 0xF));
-	bg2_map[((y+1) * 32) + x] = SE_PALBANK(pal) | (((c & 0xF0) << 1) | (c & 0xF)) + 0x10;
-}
-
-void draw_string_ex(int x, int y, char* s, int pal) {
-	while(*s) {
-		draw_char(x, y, *s, pal);
-		x++;
-		s++;
-	}
-}
-
-void draw_string(int x, int y, char* s) {
-	draw_string_ex(x, y, s, 1);
-}
-
-void draw_score() {
-	draw_string(22, 7, "Score");
-	draw_string(22, 9, score_str);
-}
-
 void initialize_font()
 {
 	memset16(bg2_map, 13, 0x1000);
@@ -505,7 +505,7 @@ void initialize_font()
 	dma3_cpy(&tile_mem[FONT_CBB], bizcatTiles, bizcatTilesLen);
 
 	// copy da pal
-	dma3_cpy(MEM_PAL + (sizeof(u16) * 16), bizcatPal, sizeof(u16) * 16);
+	dma3_cpy((u8*)MEM_PAL + (sizeof(u16) * 16), bizcatPal, sizeof(u16) * 16);
 
 	REG_BG2CNT = BG_CBB(FONT_CBB) | BG_SBB(FONT_SCREEN_NUM) | BG_4BPP | BG_PRIO(0);
 	REG_BG2HOFS = 0;
@@ -526,12 +526,13 @@ void draw_menu_items() {
 void initialize_menu() {
 	vid_vsync();
 	// copy the menu tiles in
-	dma3_cpy(MEM_VRAM, menu_tilesTiles, menu_tilesTilesLen);
-	dma3_cpy(MEM_VRAM, title_screenTiles, title_screenTilesLen);
+	dma3_cpy((u8*)MEM_VRAM, menu_tilesTiles, menu_tilesTilesLen);
+	dma3_cpy((u8*)MEM_VRAM, title_screenTiles, title_screenTilesLen);
 
 	// copy the menu tile pal
 	//dma3_cpy(MEM_PAL, menu_tilesPal, sizeof(u16) * 16);
-	dma3_cpy(MEM_PAL, title_screenPal, sizeof(u16) * 256);
+	dma3_cpy((
+		u8*)MEM_PAL, title_screenPal, sizeof(u16) * 256);
 
 	// load the font
 	initialize_font();
@@ -551,15 +552,15 @@ void initialize_menu() {
 void initialize_display() {
 	vid_vsync();
 	// clear the palatte memory before loading
-	memset16(MEM_PAL, 0, 0x100);
+	memset16((u16*)MEM_PAL, 0, 0x100);
 
 	memset16(bg1_map, 0, 0x400);
 
 	// copy the tiles in
-	dma3_cpy(MEM_VRAM, bg_tilesTiles, bg_tilesTilesLen);
+	dma3_cpy((u8*)MEM_VRAM, bg_tilesTiles, bg_tilesTilesLen);
 
 	// copy the tiles pal in
-	dma3_cpy(MEM_PAL, bg_tilesPal, 0x10);
+	dma3_cpy((u8*)MEM_PAL, bg_tilesPal, 0x10);
 
 	// load the sprites
 	dma3_cpy(&tile_mem[4][0], spritesTiles, spritesTilesLen);
@@ -613,7 +614,6 @@ bool is_high_score(int score) {
 }
 
 void insert_high_score(high_score_entry* new_entry) {
-	high_score_entry temps[sizeof(high_scores) / sizeof(high_score_entry)];
 	for (int i = 0; i < sizeof(high_scores) / sizeof(high_score_entry); i++) {
 		if (new_entry->score > high_scores[i].score) {
 			memmove(&high_scores[i+1], &high_scores[i], ((sizeof(high_scores) / sizeof(high_score_entry) - 1 - i) * sizeof(high_score_entry)));
