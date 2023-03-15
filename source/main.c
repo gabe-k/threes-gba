@@ -96,7 +96,7 @@ SCR_ENTRY *bg0_map = se_mem[MENU_SCREEN_NUM];
 SCR_ENTRY *bg1_map = se_mem[GAME_SCREEN_NUM];
 SCR_ENTRY *bg2_map = se_mem[FONT_SCREEN_NUM];
 
-#define SET_TILE(m, x, y, t, p) (m[(y * 32) + x] = SE_PALBANK(p) | t)
+#define SET_TILE(m, x, y, t, p) (m[((y) * 32) + x] = SE_PALBANK(p) | t)
 
 bool is_deck_empty(char* deck) {
 	return deck[0] == 0;
@@ -187,39 +187,39 @@ void draw_background() {
 	REG_BG1VOFS = 0;
 
 	// top border
-	bg1_map[(1 * 32) + 8] = SE_PALBANK(0) | 1;
+	SET_TILE(bg1_map, 8, 1, 1, 0);
 	for (int i = 0; i < 12; i++) {
-		bg1_map[(1 * 32) + 9 + i] = SE_PALBANK(0) | 2;
+		SET_TILE(bg1_map, 9 + i, 1, 2, 0);
 	}
-	bg1_map[(1 * 32) + 21] = SE_PALBANK(0) | 3;
+	SET_TILE(bg1_map, 21, 1, 3, 0);
 
-	bg1_map[(2 * 32) + 8] = SE_PALBANK(0) | 4;
+	SET_TILE(bg1_map, 8, 2, 4, 0);
 	for (int i = 0; i < 12; i++) {
-		bg1_map[(2 * 32) + 9 + i] = SE_PALBANK(0) | 5;
+		SET_TILE(bg1_map, 9 + i, 2, 5, 0);
 	}
-	bg1_map[(2 * 32) + 21] = SE_PALBANK(0) | 6;
+	SET_TILE(bg1_map, 21, 2, 6, 0);
 
-
+	// middle
 	for (int y = 0; y < 14; y++) {
-		bg1_map[((3 + y) * 32) + 8] = SE_PALBANK(0) | 12;
-		bg1_map[((3 + y) * 32) + 21] = SE_PALBANK(0) | 13;
+		SET_TILE(bg1_map, 8, 3 + y, 12, 0);
+		SET_TILE(bg1_map, 21, 3 + y, 13, 0);
 		for (int x = 0; x < 12; x++) {
-			bg1_map[((3 + y) * 32) + 9 + x] = SE_PALBANK(0) | 5;
+			SET_TILE(bg1_map, 9 + x, 3 + y, 5, 0);
 		}
 	}
 
-	bg1_map[(17 * 32) + 8] = SE_PALBANK(0) | 7;
-	bg1_map[(17 * 32) + 21] = SE_PALBANK(0) | 8;
+	SET_TILE(bg1_map, 8, 17, 7, 0);
+	SET_TILE(bg1_map, 21, 17, 8, 0);
 	for (int i = 0; i < 12; i++) {
-		bg1_map[(17 * 32) + 9 + i] = SE_PALBANK(0) | 5;
+		SET_TILE(bg1_map, 9 + i, 17, 5, 0);
 	}
 
 	// bottom border
-	bg1_map[(18 * 32) + 8] = SE_PALBANK(0) | 9;
+	SET_TILE(bg1_map, 8, 18, 9, 0);
 	for (int i = 0; i < 12; i++) {
-		bg1_map[(18 * 32) + 9 + i] = SE_PALBANK(0) | 10;
+		SET_TILE(bg1_map, 9 + i, 18, 10, 0);
 	}
-	bg1_map[(18 * 32) + 21] = SE_PALBANK(0) | 11;
+	SET_TILE(bg1_map, 21, 18, 11, 0);
 }
 
 void draw_board() {
