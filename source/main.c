@@ -517,8 +517,7 @@ void draw_menu_items() {
 		if (i == selected_item) {
 			draw_char(menu_items[i].x - 2, menu_items[i].y, 0x11, 1);
 		} else {
-			draw_char(menu_items[i].x - 2, menu_items[i].y, ' '
-				, 1);
+			draw_char(menu_items[i].x - 2, menu_items[i].y, ' ', 1);
 		}
 		draw_string(menu_items[i].x, menu_items[i].y, menu_items[i].str);
 	}
@@ -644,6 +643,8 @@ void draw_high_scores() {
 	}
 }
 
+#define NAME_INPUT_X 10
+#define NAME_INPUT_Y 8
 void draw_name_input() {
 // high score is drawn at x 10, y 5
 #define UP_ARROW_TILE (546 - 512)
@@ -651,17 +652,17 @@ void draw_name_input() {
 	for(int i = 0; i <= name_input_index; i++) {
 		// do or do not draw the arrows
 		if (i != name_input_index) {
-			SET_TILE(bg2_map, 10 + i, 7, 0x40, 1);
-			SET_TILE(bg2_map, 10 + i, 10, 0x40, 1);
+			SET_TILE(bg2_map, NAME_INPUT_X + i, NAME_INPUT_Y - 1, 0x40, 1);
+			SET_TILE(bg2_map, NAME_INPUT_X + i, NAME_INPUT_Y + 2, 0x40, 1);
 		} else {
-			SET_TILE(bg2_map, 10 + i, 7, UP_ARROW_TILE, 1);
-			SET_TILE(bg2_map, 10 + i, 10, DOWN_ARROW_TILE, 1);
+			SET_TILE(bg2_map, NAME_INPUT_X + i, NAME_INPUT_Y - 1, UP_ARROW_TILE, 1);
+			SET_TILE(bg2_map, NAME_INPUT_X + i, NAME_INPUT_Y + 2, DOWN_ARROW_TILE, 1);
 		}
 
 		if (name_input[i]) {
-			draw_char(10 + i, 8, name_input[i], 1);
+			draw_char(NAME_INPUT_X + i, NAME_INPUT_Y, name_input[i], 1);
 		} else {
-			draw_char(10 + i, 8, '_', 1);
+			draw_char(NAME_INPUT_X + i, NAME_INPUT_Y, '_', 1);
 		}
 	}
 }
@@ -789,6 +790,7 @@ int main() {
 
 			move_state += 3;
 
+			// done moving
 			if (move_state == 21) {
 				// update the actual board
 				memcpy(board, new_board, sizeof(new_board));
@@ -816,9 +818,6 @@ int main() {
 						memset(name_input, 0, sizeof(name_input));
 						name_input_index = 0;
 						continue;
-						//strcpy(new_score.name, "gabe_k"); // temp
-						//new_score.score = score;
-						//insert_high_score(&new_score);
 					} else {
 						draw_box(10, 4, 10, 6);
 						draw_string(13, 5, "GAME");
@@ -852,7 +851,19 @@ int main() {
 				}		
 			}
 			if (key_hit(KEY_A)) {
-				name_input_index += 1;
+				// add a character
+				if (name_input_index + 1 < sizeof(name_input)) {
+					name_input_index += 1;
+				}
+			} else if (key_hit(KEY_B)) {
+				// delete a character
+				if (name_input_index > 0) {
+					name_input[name_input_index] = 0;
+					for(int i = -1; i < 4; i++) {
+						SET_TILE(bg2_map, NAME_INPUT_X + name_input_index, NAME_INPUT_Y + i, 0x40, 1);
+					}
+					name_input_index -= 1;
+				}
 			}
 			if (key_hit(KEY_START)) {
 				high_score_entry new_score;
