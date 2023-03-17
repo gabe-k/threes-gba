@@ -399,8 +399,8 @@ void draw_string(int x, int y, char* s) {
 }
 
 void draw_score() {
-	draw_string(22, 7, "Score");
-	draw_string(22, 9, score_str);
+	draw_string(23, 4, "Score");
+	draw_string(23, 6, score_str);
 }
 
 void reset_board() {
@@ -421,7 +421,7 @@ void reset_board() {
 	// clear the "Game over!" text
 	draw_string(10, 0, "          ");
 	// clear the score text
-	draw_string(22, 9, "       ");
+	draw_string(23, 6, "       ");
 
 	next_tile = random_game_tile();
 }
@@ -531,8 +531,7 @@ void initialize_menu() {
 
 	// copy the menu tile pal
 	//dma3_cpy(MEM_PAL, menu_tilesPal, sizeof(u16) * 16);
-	dma3_cpy((
-		u8*)MEM_PAL, title_screenPal, sizeof(u16) * 256);
+	dma3_cpy((u8*)MEM_PAL, title_screenPal, sizeof(u16) * 256);
 
 	// load the font
 	initialize_font();
