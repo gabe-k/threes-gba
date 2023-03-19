@@ -398,9 +398,11 @@ void draw_string(int x, int y, char* s) {
 	draw_string_ex(x, y, s, 1);
 }
 
+#define SCORE_LABEL_X 23
+#define SCORE_LABEL_Y 4
 void draw_score() {
-	draw_string(23, 4, "Score");
-	draw_string(23, 6, score_str);
+	draw_string(SCORE_LABEL_X, SCORE_LABEL_Y, "Score");
+	draw_string(SCORE_LABEL_X, SCORE_LABEL_Y + 2, score_str);
 }
 
 void reset_board() {
@@ -421,7 +423,7 @@ void reset_board() {
 	// clear the "Game over!" text
 	draw_string(10, 0, "          ");
 	// clear the score text
-	draw_string(23, 6, "       ");
+	draw_string(SCORE_LABEL_X, SCORE_LABEL_Y + 2, "       ");
 
 	next_tile = random_game_tile();
 }
