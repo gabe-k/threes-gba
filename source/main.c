@@ -168,12 +168,12 @@ void oam_init(OBJ_ATTR *obj, uint count)
     u32 *dst= (u32*)obj;
 
     // Hide each object
-
     while(nn--)
     {
         *dst++= ATTR0_HIDE;
         *dst++= 0;
     }
+
     // init oam
     oam_copy(oam_mem, obj, count);
 }
@@ -270,7 +270,6 @@ void attempt_move_tile(int x, int y, int x_n, int y_n) {
 		new_board[x_n][y_n] = board[x][y];
 		moving_board[x][y] = 1;
 		state = moving;
-		//board[x][y] = empty;
 		return;
 	}
 
@@ -441,7 +440,7 @@ void load_save() {
 		return;
 	}
 
-	//memcpy(high_scores, sram_mem + 4, sizeof(high_scores));
+	// load from sram
 	vu8* v_sram = (vu8*)sram_mem;
 	u8* high_scores_ptr = (u8*)high_scores;
 	for (int i = 0; i < sizeof(high_scores); i++) {
@@ -614,6 +613,7 @@ bool is_high_score(int score) {
 	return false;
 }
 
+// add a high score and save it to sram
 void insert_high_score(high_score_entry* new_entry) {
 	for (int i = 0; i < sizeof(high_scores) / sizeof(high_score_entry); i++) {
 		if (new_entry->score > high_scores[i].score) {
@@ -623,7 +623,6 @@ void insert_high_score(high_score_entry* new_entry) {
 		}
 	}
 
-	//memcpy(sram_mem + 4, high_scores, sizeof(high_scores));
 	vu8* v_sram = (vu8*)sram_mem;
 	u8* high_scores_ptr = (u8*)high_scores;
 	for (int i = 0; i < sizeof(high_scores); i++) {
@@ -631,6 +630,7 @@ void insert_high_score(high_score_entry* new_entry) {
 	}
 }
 
+// draw the high scores
 void draw_high_scores() {
 	char cur_score[6];
 	for (int i = 0; i < sizeof(high_scores) / sizeof(high_score_entry); i++) {
