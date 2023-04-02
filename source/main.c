@@ -9,7 +9,6 @@
 
 #include "sprites.h"
 #include "bg_tiles.h"
-#include "menu_tiles.h"
 #include "title_screen.h"
 #include "bizcat.h"
 
@@ -527,18 +526,15 @@ void draw_menu_items() {
 void initialize_menu() {
 	vid_vsync();
 	// copy the menu tiles in
-	dma3_cpy((u8*)MEM_VRAM, menu_tilesTiles, menu_tilesTilesLen);
 	dma3_cpy((u8*)MEM_VRAM, title_screenTiles, title_screenTilesLen);
 
 	// copy the menu tile pal
-	//dma3_cpy(MEM_PAL, menu_tilesPal, sizeof(u16) * 16);
 	dma3_cpy((u8*)MEM_PAL, title_screenPal, sizeof(u16) * 256);
 
 	// load the font
 	initialize_font();
 
 	// clear the map
-	//memset16(bg0_map, 4, 240 * 160);
 	dma3_cpy(bg0_map, title_screenMap, title_screenMapLen);
 	draw_menu_items();
 
