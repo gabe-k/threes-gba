@@ -14,13 +14,6 @@
 
 int tick = 0; // for seeding rng
 
-// menu state
-
-
-// save data
-
-#define MAGIC_OFFSET
-
 char name_input[10];
 int name_input_index = 0;
 
